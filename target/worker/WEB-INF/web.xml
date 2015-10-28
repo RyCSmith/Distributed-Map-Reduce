@@ -8,16 +8,25 @@
          <servlet-class>edu.upenn.cis455.mapreduce.worker.WorkerServlet</servlet-class>
          <init-param>
            <param-name>storagedir</param-name>
-           <param-value>/home/cis455/storage/</param-value>
+           <param-value>/Users/ryancsmith/Documents/jetty_cluster/local_storage/jetty_3/</param-value>
          </init-param>
          <init-param>
            <param-name>master</param-name>
-           <param-value>127.0.0.1:3000</param-value>
+           <param-value>0.0.0.0:8080</param-value>
          </init-param>
+         <init-param>
+           <param-name>port</param-name>
+           <param-value>8003</param-value>
+         </init-param>
+         <load-on-startup>1</load-on-startup>
      </servlet>
 
      <servlet-mapping>
          <servlet-name>WorkerServlet</servlet-name>
-         <url-pattern>/*</url-pattern>
+         <url-pattern>/runmap</url-pattern>
+     </servlet-mapping>
+     <servlet-mapping>
+         <servlet-name>WorkerServlet</servlet-name>
+         <url-pattern>/runreduce</url-pattern>
      </servlet-mapping>
 </web-app>
