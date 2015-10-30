@@ -12,12 +12,21 @@ public class MapperThread extends Thread {
 	Job jobClassInstance;
 	WorkerContext context;
 	
+	/**
+	 * Default constructor. 
+	 * @param fileAssignments - FileAssignments for this thread to process.
+	 * @param jobClassInstance - Job class for this map reduce operation.
+	 * @param context - Context object for emit'ing to files.
+	 */
 	public MapperThread(ArrayList<FileAssignment> fileAssignments, Job jobClassInstance, WorkerContext context) {
 		this.fileAssignments = fileAssignments;
 		this.jobClassInstance = jobClassInstance;
 		this.context = context;
 	}
 	
+	/**
+	 * Main execution. Processes each FileAssignment given to this thread.
+	 */
 	public void run() {
 		for (FileAssignment current : fileAssignments) {
 			try {
@@ -28,6 +37,11 @@ public class MapperThread extends Thread {
 		}
 	}
 	
+	/**
+	 * Processes each line of a given FileAssignment.
+	 * @param current
+	 * @throws IOException
+	 */
 	private void readAndProcessFA(FileAssignment current) throws IOException {
 		BufferedReader reader = new BufferedReader(new FileReader(current.file));
 		String line;
@@ -47,6 +61,10 @@ public class MapperThread extends Thread {
 		reader.close();
 	}
 	
+	/**
+	 * Parses a given single line and calls the jobs class's map() function.
+	 * @param line
+	 */
 	private void processSingleLine(String line) {
 		int firstTabIndex = line.indexOf("\t");
         String key = line.substring(0, firstTabIndex);
