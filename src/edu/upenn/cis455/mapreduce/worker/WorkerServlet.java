@@ -112,6 +112,8 @@ public class WorkerServlet extends HttpServlet {
 		ArrayList<ArrayList<FileAssignment>> fileAssignments = splitWork(numThreads, getFullDirectoryPath(relativeInputDir));
 		WorkerContext context = new WorkerContext(workerNodeMap, getFullDirectoryPath("spool-out"));
 		ArrayList<MapperThread> threadsList = new ArrayList<MapperThread>();
+		
+		//load requested class and create all threads
 		for (int i = 0; i < numThreads; i++) {
 			//load class
 			Job mapperJob = null;
@@ -128,20 +130,23 @@ public class WorkerServlet extends HttpServlet {
 		
 		//start all threads
 		for (MapperThread thread : threadsList) {
-			//thread.start();
-			System.out.println("Starting thread: " + thread.getName());
+			thread.start();
+			System.out.println("Starting thread: " + thread.getName() + " with assignments:");
 			for (FileAssignment assign : thread.fileAssignments) {
 				System.out.println("\t" + assign);
 			}
 		}
 		//join all threads
 		for (MapperThread thread : threadsList) {
-//			try {
-//				//thread.join();
-//			} catch (InterruptedException e) {
-//				e.printStackTrace();
-//			}
-		}		
+			try {
+				thread.join();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}	
+		
+		//close PrintWriters opened in context
+		context.closeWriters();
 		status = Status.WAITING;
 	}
 	
