@@ -12,6 +12,7 @@ import javax.servlet.*;
 import javax.servlet.http.*;
 
 import edu.upenn.cis455.mapreduce.Job;
+import edu.upenn.cis455.mapreduce.job.*;
 
 public class WorkerServlet extends HttpServlet {
 	public static enum Status { MAPPING, WAITING, REDUCING, IDLE };
@@ -100,21 +101,40 @@ public class WorkerServlet extends HttpServlet {
 	public void mapHandler(HttpServletRequest request, HttpServletResponse response) throws java.io.IOException {
 		status = Status.MAPPING;
 		String jobClass = request.getParameter("job");
-		int numThreads = Integer.parseInt(request.getParameter("job"));
+		int numThreads = Integer.parseInt(request.getParameter("numThreads"));
 		String relativeInputDir = request.getParameter("input");
 		ArrayList<ArrayList<FileAssignment>> fileAssignments = splitWork(numThreads, getFullDirectoryPath(relativeInputDir));
-		//load class
-		Class servletClass;
-		try {
-			servletClass = Class.forName(jobClass);
-			Job servlet = (Job) servletClass.newInstance();
-		} catch (InstantiationException | IllegalAccessException e) {
-			e.printStackTrace();
-		}catch (ClassNotFoundException e1) {
-			e1.printStackTrace();
+		ArrayList<MapperThread> threadsList = new ArrayList<MapperThread>();
+		for (int i = 0; i < numThreads; i++) {
+			//load class
+			Job mapperJob = null;
+			try {
+				Class mapperClass = Class.forName(jobClass);
+				mapperJob = (Job) mapperClass.newInstance();
+			} catch (InstantiationException | IllegalAccessException e) {
+				e.printStackTrace();
+			}catch (ClassNotFoundException e1) {
+				e1.printStackTrace();
+			}
+			threadsList.add(new MapperThread(fileAssignments.get(i), mapperJob, new WorkerContext()));
 		}
 		
-		
+		//start all threads
+		for (MapperThread thread : threadsList) {
+			//thread.start();
+			System.out.println("Starting thread: " + thread.getName());
+			for (FileAssignment assign : thread.fileAssignments) {
+				System.out.println("\t" + assign);
+			}
+		}
+		//join all threads
+		for (MapperThread thread : threadsList) {
+//			try {
+//				//thread.join();
+//			} catch (InterruptedException e) {
+//				e.printStackTrace();
+//			}
+		}		
 		status = Status.WAITING;
 	}
 	
@@ -128,35 +148,97 @@ public class WorkerServlet extends HttpServlet {
 		
 		//check what's in the directory
 		File directory = new File(inputDir);
-		List<File> files = Arrays.asList(directory.listFiles());
-		
-		//handle case = more files than threads
-		if (files.size() >= numThreads) {
-			Collections.sort(files, new FileLengthComparator());
+		List<File> temp = Arrays.asList(directory.listFiles());
+		ArrayList<File> files = new ArrayList<File>();
+		for (File file : temp) {
+			if (!file.getName().contains(".DS_Store"))
+				files.add(file);
 		}
 		
+		if (files.size() >= numThreads) 
+			distributeFiles(numThreads, files, fileAssignments);
+		else 
+			divideFiles(numThreads, files, fileAssignments);
+		return fileAssignments;
+		
+	}
+	
+	private void divideFiles(int numThreads, ArrayList<File> files, ArrayList<ArrayList<FileAssignment>> fileAssignments) {
+		Collections.sort(files, new FileLengthComparator());
+		int fileCounter = 0;
+		int jobsAssigned = 0;
+		int threadsPerFile = numThreads / files.size();
+		int remainder = numThreads % files.size();
+		
+		while (fileCounter < remainder) {
+			File current = files.get(fileCounter);
+			int totalLines = countNumberLines(current);
+			int linesPerThread = totalLines / (threadsPerFile + 1);
+			for (int i = 0; i < (threadsPerFile + 1); i++) {
+				FileAssignment fa;
+				if (i == threadsPerFile)
+					fa = new FileAssignment(current, (i * linesPerThread) + 1, totalLines);
+				else
+					fa = new FileAssignment(current, (i * linesPerThread) + 1, (i + 1) * linesPerThread);
+				fileAssignments.get(jobsAssigned).add(fa);
+				jobsAssigned++;
+			}
+			fileCounter++;
+		}
+		while (fileCounter < files.size()) {
+			File current = files.get(fileCounter);
+			int totalLines = countNumberLines(current);
+			int linesPerThread = totalLines / threadsPerFile;
+			for (int i = 0; i < threadsPerFile; i++) {
+				FileAssignment fa;
+				if (i == threadsPerFile - 1)
+					fa = new FileAssignment(current, (i * linesPerThread) + 1, totalLines);
+				else
+					fa = new FileAssignment(current, (i * linesPerThread) + 1, (i + 1) * linesPerThread);
+				fileAssignments.get(jobsAssigned).add(fa);
+				jobsAssigned++;
+			}
+			fileCounter++;
+		}
+		
+	}
+	
+	private int countNumberLines(File file) {
+		int count = 0;
+		try {
+			BufferedReader reader = new BufferedReader(new FileReader(file));
+			String line;
+			while ((line = reader.readLine()) != null) {
+				count++;
+			}
+		} catch (Exception e) {
+			return 2;
+		}
+		return count;
+	}
+	
+	private void distributeFiles(int numThreads, ArrayList<File> files, ArrayList<ArrayList<FileAssignment>> fileAssignments) {
+		Collections.sort(files, new FileLengthComparator());	
 		int currentThread = 0;
 		boolean countDown = false;
-		while (files.size() > numThreads) {
+		while (!files.isEmpty()) {
 			File current = files.get(0);
 			FileAssignment fAssign = new FileAssignment(current);
 			fileAssignments.get(currentThread).add(fAssign);
+			files.remove(files.get(0));
 			
 			if (countDown) {
 				if (currentThread == 0) {
 					countDown = false;
-					currentThread++;
 				} else
 					currentThread--;
 			} else {
 				if (currentThread == fileAssignments.size() - 1) {
 					countDown = true;
-					currentThread--;
 				} else
 					currentThread++;
 			}
 		}
-		return fileAssignments;
 	}
 	
 	public String getFullDirectoryPath(String relativePath) {

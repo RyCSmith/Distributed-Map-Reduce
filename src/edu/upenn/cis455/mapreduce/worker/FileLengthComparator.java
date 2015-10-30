@@ -8,9 +8,9 @@ public class FileLengthComparator implements Comparator<File> {
 		long file1length = file1.length();
 		long file2length = file2.length();
 		if (file1length > file2length)
-			return 1;
-		if (file1length < file2length)
 			return -1;
+		if (file1length < file2length)
+			return 1;
 		else
 			return 0;
 	}

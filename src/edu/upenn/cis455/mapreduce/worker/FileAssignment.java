@@ -31,4 +31,12 @@ public class FileAssignment {
 		this.endLine = endLine;
 		entireFile = false;
 	}
+	
+	@Override
+	public String toString(){
+		if (entireFile)
+			return file.getName() + ": FULL";
+		else
+			return file.getName() + ": start=" + startLine + " end=" + endLine;
+	}
 }

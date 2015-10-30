@@ -3,15 +3,16 @@ package edu.upenn.cis455.mapreduce.worker;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
 
 import edu.upenn.cis455.mapreduce.Job;
 
 public class MapperThread extends Thread {
-	FileAssignment[] fileAssignments;
+	ArrayList<FileAssignment> fileAssignments;
 	Job jobClassInstance;
 	WorkerContext context;
 	
-	public MapperThread(FileAssignment[] fileAssignments, Job jobClassInstance, WorkerContext context) {
+	public MapperThread(ArrayList<FileAssignment> fileAssignments, Job jobClassInstance, WorkerContext context) {
 		this.fileAssignments = fileAssignments;
 		this.jobClassInstance = jobClassInstance;
 		this.context = context;
@@ -36,7 +37,7 @@ public class MapperThread extends Thread {
             }
 		}
 		else {
-			int count = 0;
+			int count = 1;
 			while ((line = reader.readLine()) != null) {
 				if (count >= current.startLine && count <= current.endLine)
 					processSingleLine(line);
