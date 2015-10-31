@@ -113,14 +113,19 @@ public class WorkerServlet extends HttpServlet {
 		long startTime = System.currentTimeMillis();
 		status = Status.MAPPING;
 		makeDirectories(); // creates new spool-in / spool-out directories
+		
+		//parse params from request
 		String jobClass = request.getParameter("job");
 		int numThreads = Integer.parseInt(request.getParameter("numThreads"));
 		String relativeInputDir = request.getParameter("input");
 		HashMap<String, String> workerNodeMap = retrieveWorkerNodes(request.getParameterMap());
+		
+		//send response indicating that request was received
 		response.setContentType("text/html");
 		PrintWriter out = response.getWriter();
 		out.println("RECEIVED");
 		out.close();
+		
 		ArrayList<ArrayList<FileAssignment>> fileAssignments = splitWork(numThreads, getFullDirectoryPath(relativeInputDir));
 		MapperContext context = new MapperContext(workerNodeMap, getFullDirectoryPath("spool-out"));
 		ArrayList<MapperThread> threadsList = new ArrayList<MapperThread>();
@@ -367,7 +372,6 @@ public class WorkerServlet extends HttpServlet {
 		String jobClass = request.getParameter("job");
 		int numThreads = Integer.parseInt(request.getParameter("numThreads"));
 		String relativeOutputDir = request.getParameter("output");
-		System.out.println("\n\njob:" + jobClass + " numThreads:" + numThreads + " output:" + relativeOutputDir);
 		
 		//send response indicating that request was received
 		response.setContentType("text/html");

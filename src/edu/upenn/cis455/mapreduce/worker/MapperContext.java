@@ -13,6 +13,10 @@ import java.util.HashMap;
 
 import edu.upenn.cis455.mapreduce.Context;
 
+/**
+ * Provides output writing functionality for map functions
+ * of map reduce jobs.
+ */
 public class MapperContext implements Context {
 	
 	ArrayList<PrintWriter> fileWriters;
