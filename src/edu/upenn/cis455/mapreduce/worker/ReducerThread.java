@@ -13,6 +13,7 @@ public class ReducerThread extends Thread {
 	FileAssignment fileAssignment;
 	Job jobClassInstance;
 	ReducerContext context;
+	WorkerServlet masterServlet;
 	
 	/**
 	 * Default constructor.
@@ -20,7 +21,9 @@ public class ReducerThread extends Thread {
 	 * @param jobClassInstance
 	 * @param context
 	 */
-	public ReducerThread(FileAssignment fileAssignment, Job jobClassInstance, ReducerContext context) {
+	public ReducerThread(WorkerServlet masterServlet, 
+			FileAssignment fileAssignment, Job jobClassInstance, ReducerContext context) {
+		this.masterServlet = masterServlet;
 		this.fileAssignment = fileAssignment;
 		this.jobClassInstance = jobClassInstance;
 		this.context = context;
@@ -44,6 +47,7 @@ public class ReducerThread extends Thread {
 				KeyValPair parsedLine = new KeyValPair(line);
 				if (fileAssignment.entireFile ||
 						(lineCount >= fileAssignment.startLine && lineCount <= fileAssignment.endLine)) {
+					masterServlet.incrementKeysRead();
 					if (currentKey == null) {
 						currentKey = parsedLine.key;
 						valueSet = new ArrayList<String>();

@@ -11,6 +11,7 @@ public class MapperThread extends Thread {
 	ArrayList<FileAssignment> fileAssignments;
 	Job jobClassInstance;
 	MapperContext context;
+	WorkerServlet masterServlet;
 	
 	/**
 	 * Default constructor. 
@@ -18,7 +19,9 @@ public class MapperThread extends Thread {
 	 * @param jobClassInstance - Job class for this map reduce operation.
 	 * @param context - Context object for emit'ing to files.
 	 */
-	public MapperThread(ArrayList<FileAssignment> fileAssignments, Job jobClassInstance, MapperContext context) {
+	public MapperThread(WorkerServlet masterServlet, 
+			ArrayList<FileAssignment> fileAssignments, Job jobClassInstance, MapperContext context) {
+		this.masterServlet = masterServlet;
 		this.fileAssignments = fileAssignments;
 		this.jobClassInstance = jobClassInstance;
 		this.context = context;
@@ -48,13 +51,16 @@ public class MapperThread extends Thread {
 		if (current.entireFile) {
 			while ((line = reader.readLine()) != null) {
 				processSingleLine(line);
+				masterServlet.incrementKeysRead();
             }
 		}
 		else {
 			int count = 1;
 			while ((line = reader.readLine()) != null) {
-				if (count >= current.startLine && count <= current.endLine)
+				if (count >= current.startLine && count <= current.endLine) {
 					processSingleLine(line);
+					masterServlet.incrementKeysRead();
+				}
 				count++;
 			}
 		}

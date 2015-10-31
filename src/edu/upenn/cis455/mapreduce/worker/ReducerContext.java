@@ -15,6 +15,7 @@ import edu.upenn.cis455.mapreduce.Context;
 public class ReducerContext implements Context {
 
 	PrintWriter outputWriter;
+	WorkerServlet masterServlet;
 	
 	/**
 	 * Default constructor.
@@ -22,7 +23,8 @@ public class ReducerContext implements Context {
 	 * Deletes first if this file already exists.
 	 * @param outputDir
 	 */
-	public ReducerContext(String outputDir) {
+	public ReducerContext(WorkerServlet masterServlet, String outputDir) {
+		this.masterServlet = masterServlet;
 		try {
 			File outputFile = new File(outputDir);
 			if (outputFile.exists())
@@ -41,6 +43,12 @@ public class ReducerContext implements Context {
 	@Override
 	public synchronized void write(String key, String value) {
 		outputWriter.println(key + "\t" + value);
+		masterServlet.incrementKeysWritten();
 	}
-
+	
+	public void closeWriter() {
+		try {
+			outputWriter.close();
+		} catch (Exception e) { }
+	}
 }

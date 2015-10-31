@@ -122,6 +122,7 @@ public class MasterServlet extends HttpServlet {
 	    		workersStatus.put(request.getRemoteAddr() + ":" + port, data);
 	    	}
 	    	feederThread.checkThreadsReadyToReduce();
+	    	feederThread.checkThreadsReadyForNextJob();
 	    	out.println("SUCCESS");
 	    } catch (Exception e) {
 	    	out.println("FAILURE");

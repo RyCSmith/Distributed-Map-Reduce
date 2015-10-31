@@ -14,7 +14,8 @@ public class FeederThread extends Thread {
 	HashMap<String, WorkerData> workersStatus;
 	private Queue<JobSubmission> jobQueue;
 	JobSubmission currentJob;
-	Boolean workersReady;
+	Boolean workersReadyToReduce;
+	Boolean workersReadyForNextJob;
 	
 	/**
 	 * Default constructor.
@@ -24,7 +25,8 @@ public class FeederThread extends Thread {
 		this.jobQueue = new LinkedList<JobSubmission>();
 		this.workersStatus = workersStatus;
 		proceed = true;
-		workersReady = false;
+		workersReadyToReduce = false;
+		workersReadyForNextJob = false;
 	}
 	
 	/**
@@ -40,10 +42,13 @@ public class FeederThread extends Thread {
 				currentJob = getNextJob();
 				System.out.println("Feeder thread: Send Map job to workers");
 				sendJobToWorkers(0, currentJob.className, currentJob.inputDir, currentJob.numMapThreads);
-				System.out.println("Feeder thread: WaitToProceed");
-				waitToProceed();
+				System.out.println("Feeder thread: Waiting for workers to complete mapping.");
+				waitToProceedToReduce();
 				System.out.println("Feeder thread: Send Reduce job to workers");
 				sendJobToWorkers(1, currentJob.className, currentJob.outputDir, currentJob.numReduceThreads);
+				System.out.println("Feeder thread: Waiting for workers to complete reducing.");
+				setWorkersReadyForNextJob(false);
+				waitToProceedToNextJob();
 				System.out.println("Feeder thread: Complete");
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -92,16 +97,16 @@ public class FeederThread extends Thread {
 	 * Makes this thread wait to proceed until all workers have completed mapping.
 	 * @throws InterruptedException
 	 */
-	public synchronized void waitToProceed() throws InterruptedException {
-		while (!workersReady) {
+	public synchronized void waitToProceedToReduce() throws InterruptedException {
+		while (!workersReadyToReduce) {
 			wait();
 		}
-		workersReady = false;
+		workersReadyToReduce = false;
 	}
 	
 	/**
 	 * Checks if all threads are in the WAITING state (finished mapping, ready to reduce). 
-	 * If so, notifies the thread if it is waiting on the workersReady variable.
+	 * If so, notifies the thread if it is waiting on the workersReadyToReduce variable.
 	 */
 	public synchronized void checkThreadsReadyToReduce() {
 		synchronized (workersStatus) {
@@ -110,7 +115,7 @@ public class FeederThread extends Thread {
 					return;
 			}
 		}
-		workersReady = true;
+		workersReadyToReduce = true;
 		notifyAll();
 	}
 
@@ -177,4 +182,33 @@ public class FeederThread extends Thread {
 		return builder.toString();
 	}
 	
+	
+	/**
+	 * Makes this thread wait to proceed until all workers are ready to receive another job.
+	 * @throws InterruptedException
+	 */
+	public synchronized void waitToProceedToNextJob() throws InterruptedException {
+		while (!workersReadyForNextJob) {
+			wait();
+		}
+	}
+	
+	/**
+	 * Checks if all threads are in the IDLE state (finished reducing or never began, ready to map). 
+	 * If so, notifies the thread if it is waiting on the workersReadyForNextJob variable.
+	 */
+	public synchronized void checkThreadsReadyForNextJob() {
+		synchronized (workersStatus) {
+			for (String key : workersStatus.keySet()) {
+				if (workersStatus.get(key).status != WorkerData.Status.IDLE)
+					return;
+			}
+		}
+		workersReadyForNextJob = true;
+		notifyAll();
+	}
+	
+	public synchronized void setWorkersReadyForNextJob(boolean ready) {
+		workersReadyForNextJob = false;
+	}
 }

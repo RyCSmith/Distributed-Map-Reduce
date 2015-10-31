@@ -22,6 +22,7 @@ public class MapperContext implements Context {
 	ArrayList<PrintWriter> fileWriters;
 	MessageDigest hashDigest;
 	BigInteger modNum;
+	WorkerServlet masterServlet;
 	
 	/**
 	 * Default constructor. Creates a file for each active worker and opens
@@ -29,8 +30,9 @@ public class MapperContext implements Context {
 	 * @param workerNodeMap
 	 * @param spoolOutDir
 	 */
-	public MapperContext(HashMap<String, String> workerNodeMap, String spoolOutDir) {
-		System.out.println("Context: context created");
+	public MapperContext(WorkerServlet masterServlet, 
+			HashMap<String, String> workerNodeMap, String spoolOutDir) {
+		this.masterServlet = masterServlet;
 		try {
 			hashDigest = MessageDigest.getInstance("SHA1");
 		} catch (NoSuchAlgorithmException e1) {
@@ -48,6 +50,7 @@ public class MapperContext implements Context {
 			}
 		}
 		modNum = new BigInteger(new Integer(fileWriters.size()).toString());
+		System.out.println("Context: context created");
 	}
 	
 	@Override
@@ -55,6 +58,7 @@ public class MapperContext implements Context {
 		int fileNum = getHash(key);
 		PrintWriter outputFileWriter = fileWriters.get(fileNum);
 		outputFileWriter.println(key + "\t" + value);
+		masterServlet.incrementKeysWritten();
 	}
 	
 	public int getHash(String key) {

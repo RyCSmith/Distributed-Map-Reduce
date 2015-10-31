@@ -112,11 +112,15 @@ public class WorkerServlet extends HttpServlet {
 	 */
 	public void mapHandler(HttpServletRequest request, HttpServletResponse response) throws java.io.IOException {
 		long startTime = System.currentTimeMillis();
+		//reset statuses
 		status = Status.MAPPING;
+		resetKeysRead();
+		resetKeysWritten();
 		makeDirectories(); // creates new spool-in / spool-out directories
 		
 		//parse params from request
 		String jobClass = request.getParameter("job");
+		this.jobClass = jobClass;
 		int numThreads = Integer.parseInt(request.getParameter("numThreads"));
 		String relativeInputDir = request.getParameter("input");
 		HashMap<String, String> workerNodeMap = retrieveWorkerNodes(request.getParameterMap());
@@ -128,7 +132,7 @@ public class WorkerServlet extends HttpServlet {
 		out.close();
 		
 		ArrayList<ArrayList<FileAssignment>> fileAssignments = splitWork(numThreads, getFullDirectoryPath(relativeInputDir));
-		MapperContext context = new MapperContext(workerNodeMap, getFullDirectoryPath("spool-out"));
+		MapperContext context = new MapperContext(this, workerNodeMap, getFullDirectoryPath("spool-out"));
 		ArrayList<MapperThread> threadsList = new ArrayList<MapperThread>();
 		
 		//load requested class and create all threads
@@ -143,7 +147,7 @@ public class WorkerServlet extends HttpServlet {
 			}catch (ClassNotFoundException e1) {
 				e1.printStackTrace();
 			}
-			threadsList.add(new MapperThread(fileAssignments.get(i), mapperJob, context));
+			threadsList.add(new MapperThread(this, fileAssignments.get(i), mapperJob, context));
 		}
 		
 		//start all threads
@@ -383,7 +387,7 @@ public class WorkerServlet extends HttpServlet {
 		int[] breakPoints = findBreakPoints(sortedMasterFile, numThreads);
 		
 		ArrayList<FileAssignment> fileAssignments = createReducerFileAssignments(breakPoints, sortedMasterFile);
-		ReducerContext context = new ReducerContext(getFullDirectoryPath(relativeOutputDir));
+		ReducerContext context = new ReducerContext(this, getFullDirectoryPath(relativeOutputDir));
 		ArrayList<ReducerThread> threadsList = new ArrayList<ReducerThread>();
 		
 		//load requested class and create all threads
@@ -398,7 +402,7 @@ public class WorkerServlet extends HttpServlet {
 			}catch (ClassNotFoundException e1) {
 				e1.printStackTrace();
 			}
-			threadsList.add(new ReducerThread(fileAssignments.get(i), reducerJob, context));
+			threadsList.add(new ReducerThread(this, fileAssignments.get(i), reducerJob, context));
 		}
 		
 		//start all threads
@@ -415,15 +419,20 @@ public class WorkerServlet extends HttpServlet {
 				e.printStackTrace();
 			}
 		}	
-		//close PrintWriters opened in context
-		//context.closeWriters();
 		
-		//do all reduce stuff, update counts (may need to be zeroed out at start) when complete status changes to IDLE
+		//close PrintWriter opened in context
+		context.closeWriter();
 		
+		//reset statuses
+		resetKeysRead();
+		resetKeysWritten();
+		this.jobClass = null;
 		status = Status.IDLE;
 	}
 	
 	public File sortAndCreateMasterFile() {
+		System.out.println("Concatenating and sorting \'spool-in\' files as an "
+				+ "outside unix process. (This may take some time)");
 		String sortedMasterFilePath = null;
 		try {
 			String fullPath = getFullDirectoryPath("spool-in");
@@ -566,5 +575,28 @@ public class WorkerServlet extends HttpServlet {
 		return assignments;
 	}
 	
+	public void incrementKeysRead() {
+		synchronized (keysRead) {
+			keysRead += 1;
+		}
+	}
+	
+	public void incrementKeysWritten() {
+		synchronized (keysWritten) {
+			keysWritten += 1;
+		}
+	}
+	
+	public void resetKeysRead() {
+		synchronized (keysRead) {
+			keysRead = 0;
+		}
+	}
+	
+	public void resetKeysWritten() {
+		synchronized (keysWritten) {
+			keysWritten = 0;
+		}
+	}
 }
   
