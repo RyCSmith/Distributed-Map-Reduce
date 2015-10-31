@@ -134,9 +134,11 @@ public class FeederThread extends Thread {
 				HttpURLConnection client = (HttpURLConnection) obj.openConnection();
 				client.setRequestMethod("POST");	
 				
-				String params = params = "job=" + job + "&input=" + directory + "&numThreads=" + numThreads;
+				String params;
 				if (mode == 0)
-					 params += getActiveWorkersQueryString();
+					params = params = "job=" + job + "&input=" + directory + "&numThreads=" + numThreads + getActiveWorkersQueryString();
+				else
+					params = params = "job=" + job + "&output=" + directory + "&numThreads=" + numThreads;
 				
 				client.setDoOutput(true);
 				DataOutputStream outStream = new DataOutputStream(client.getOutputStream());

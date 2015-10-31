@@ -1,6 +1,8 @@
 package edu.upenn.cis455.mapreduce.worker;
 
 import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -8,6 +10,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 import javax.servlet.*;
 import javax.servlet.http.*;
@@ -90,11 +93,15 @@ public class WorkerServlet extends HttpServlet {
 	 * method based on path.
 	 */
 	public void doPost(HttpServletRequest request, HttpServletResponse response) throws java.io.IOException {
-		if (request.getServletPath().equalsIgnoreCase("/runmap"))
+		System.out.println("Received a connection " + request.getServletPath());
+		if (request.getServletPath().equalsIgnoreCase("/runmap")) {
 			mapHandler(request, response);
+		}
 		else if (request.getServletPath().equalsIgnoreCase("/runreduce"))
 			reduceHandler(request, response);
-	}
+		else if (request.getServletPath().equalsIgnoreCase("/pushdata"))
+			receiveDataHandler(request, response);
+	}		
 	
 	/**
 	 * Handles POST requests for mapping operations.
@@ -103,14 +110,19 @@ public class WorkerServlet extends HttpServlet {
 	 * @throws java.io.IOException
 	 */
 	public void mapHandler(HttpServletRequest request, HttpServletResponse response) throws java.io.IOException {
+		long startTime = System.currentTimeMillis();
 		status = Status.MAPPING;
 		makeDirectories(); // creates new spool-in / spool-out directories
 		String jobClass = request.getParameter("job");
 		int numThreads = Integer.parseInt(request.getParameter("numThreads"));
 		String relativeInputDir = request.getParameter("input");
 		HashMap<String, String> workerNodeMap = retrieveWorkerNodes(request.getParameterMap());
+		response.setContentType("text/html");
+		PrintWriter out = response.getWriter();
+		out.println("RECEIVED");
+		out.close();
 		ArrayList<ArrayList<FileAssignment>> fileAssignments = splitWork(numThreads, getFullDirectoryPath(relativeInputDir));
-		WorkerContext context = new WorkerContext(workerNodeMap, getFullDirectoryPath("spool-out"));
+		MapperContext context = new MapperContext(workerNodeMap, getFullDirectoryPath("spool-out"));
 		ArrayList<MapperThread> threadsList = new ArrayList<MapperThread>();
 		
 		//load requested class and create all threads
@@ -144,10 +156,12 @@ public class WorkerServlet extends HttpServlet {
 				e.printStackTrace();
 			}
 		}	
-		
 		//close PrintWriters opened in context
 		context.closeWriters();
+		//send files to other workers
+		pushDataToOtherWorkers(workerNodeMap);
 		status = Status.WAITING;
+		System.out.println("TOTAL MAP TIME: " + (System.currentTimeMillis() - startTime) / 1000);
 	}
 	
 	public HashMap<String, String> retrieveWorkerNodes(Map<String, String[]> paramMap) {
@@ -318,6 +332,28 @@ public class WorkerServlet extends HttpServlet {
 	}
 	
 	/**
+	 * Creates a fileName for data to be placed in the spool-in directory.
+	 * First attempts to create a file with the name reflecting the ip address that sent the data.
+	 * If this file already exists, appends a random number to this ip until a unique name
+	 * has been found (case = more than one transmission from a worker during single job / two
+	 * workers operating on the same machine.)
+	 * @param address - ip address of machine sending the data (in String form)
+	 * @return
+	 */
+	public String getNewRandomFileName(String address) {
+		Random rand = new Random();
+		String spoolInDir = getFullDirectoryPath("spool-in");
+		String rootName = spoolInDir + "/" + address;
+		String fullName = rootName + "-" + rand.nextInt(1000000000);
+		File newFile = new File(fullName);
+		while (newFile.exists()) {
+			fullName = rootName + "-" + rand.nextInt(1000000000);
+			newFile = new File(fullName);
+		}
+		return fullName + ".txt";
+	}
+	
+	/**
 	 * Handles POST requests for reducing operations.
 	 * @param request
 	 * @param response
@@ -327,11 +363,197 @@ public class WorkerServlet extends HttpServlet {
 		System.out.println("GOT A REDUCE CALL");
 		status = Status.REDUCING;
 		
+		//parse params from request
+		String jobClass = request.getParameter("job");
+		int numThreads = Integer.parseInt(request.getParameter("numThreads"));
+		String relativeOutputDir = request.getParameter("output");
+		
+		//send response indicating that request was received
+		response.setContentType("text/html");
+		PrintWriter out = response.getWriter();
+		out.println("RECEIVED");
+		out.close();
+		
+		File sortedMasterFile = sortAndCreateMasterFile();
+		int[] breakPoints = findBreakPoints(sortedMasterFile, 5);
+		
+		ArrayList<FileAssignment> fileAssignments = createReducerFileAssignments(breakPoints, sortedMasterFile);
+		ReducerContext context = new ReducerContext(getFullDirectoryPath(relativeOutputDir));
+		ArrayList<ReducerThread> threadsList = new ArrayList<ReducerThread>();
+		
+		//load requested class and create all threads
+		for (int i = 0; i < numThreads; i++) {
+			//load class
+			Job reducerJob = null;
+			try {
+				Class reducerClass = Class.forName(jobClass);
+				reducerJob = (Job) reducerClass.newInstance();
+			} catch (InstantiationException | IllegalAccessException e) {
+				e.printStackTrace();
+			}catch (ClassNotFoundException e1) {
+				e1.printStackTrace();
+			}
+			threadsList.add(new ReducerThread(fileAssignments.get(i), reducerJob, context));
+		}
+		
+		//start all threads
+		for (ReducerThread thread : threadsList) {
+			thread.start();
+			System.out.println("Starting thread: " + thread.getName() + " with assignments:");
+				System.out.println("\t" + thread.fileAssignment);
+		}
+		//join all threads
+		for (ReducerThread thread : threadsList) {
+			try {
+				thread.join();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}	
+		//close PrintWriters opened in context
+		//context.closeWriters();
+		
 		//do all reduce stuff, update counts (may need to be zeroed out at start) when complete status changes to IDLE
 		
 		status = Status.IDLE;
 	}
 	
+	public File sortAndCreateMasterFile() {
+		String sortedMasterFilePath = null;
+		try {
+			String fullPath = getFullDirectoryPath("spool-in");
+			String allFiles = fullPath + "/*.txt";
+			String masterFile = fullPath + "/masterFile.txt";
+			String command = "cat " + allFiles + " > " + masterFile;
+			String[] commandArray = {"/bin/sh", "-c", command};
+			Process proc = Runtime.getRuntime().exec(commandArray);
+			proc.waitFor();
+			sortedMasterFilePath = fullPath + "/sortedMasterFile.txt";
+			String command2 = "sort -t $'\t' " + masterFile + " -o " + sortedMasterFilePath;
+			String[] commandArray2 = {"/bin/sh", "-c", command2};
+			Process proc2 = Runtime.getRuntime().exec(commandArray2);
+			proc2.waitFor();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return new File(sortedMasterFilePath);
+	}
+	
+	public void receiveDataHandler(HttpServletRequest request, HttpServletResponse response) {
+		try {
+			File outputFile = new File(getNewRandomFileName(request.getRemoteAddr()));
+			System.out.println("Attempting to create file: " + outputFile.getAbsolutePath());
+			outputFile.createNewFile();
+			FileOutputStream writer = new FileOutputStream(outputFile, true);
+	
+			InputStream in = request.getInputStream();
+			byte[] bytes = new byte[20000];
+			int bytesRead;
+
+			while ((bytesRead = in.read(bytes)) != -1) {
+			    writer.write(bytes, 0, bytesRead);
+			}			
+		
+			response.setContentType("text/plain");
+			PrintWriter out = response.getWriter();
+			out.println("SUCCESS");
+			in.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+	}
+	
+	public void pushDataToOtherWorkers(HashMap<String, String> workerNodeMap) {
+		File spoolOutDir = new File(getFullDirectoryPath("spool-out"));
+		List<File> temp = Arrays.asList(spoolOutDir.listFiles());
+		for (File file : temp) {
+			for (String key : workerNodeMap.keySet()) {
+				if (file.getName().contains(key)) {
+					System.out.println("PUSHING file data: " + file.getName() + " to " + key + " at " + workerNodeMap.get(key));
+					pushDataToWorker(file, workerNodeMap.get(key));
+				}
+			}
+		}
+	}
+	
+	public void pushDataToWorker(File file, String ipAndPort) {
+		try {
+			
+			String url = "http://" + ipAndPort + "/worker/pushdata";
+			URL obj = new URL(url);
+			HttpURLConnection client = (HttpURLConnection) obj.openConnection();
+			client.setRequestMethod("POST");
+			
+			client.setDoOutput(true);
+			BufferedWriter outStream = new BufferedWriter(new OutputStreamWriter(client.getOutputStream()));
+			
+			BufferedReader reader = new BufferedReader(new FileReader(file));
+			String line;
+			while ((line = reader.readLine()) != null) {
+				outStream.write(line + "\n");
+			}
+			
+			outStream.flush();
+			outStream.close();
+	
+			BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
+			String inputLine;
+			StringBuffer response = new StringBuffer();
+			while ((inputLine = in.readLine()) != null) {
+				response.append(inputLine);
+			}
+			in.close();
+	
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public int[] findBreakPoints(File file, int numThreads) {
+		int[] breakPoints = new int[numThreads];
+		int numLines = countNumberLines(file);
+		int linesPerThread = numLines / numThreads;
+		String lastWord = "";
+		int linesRead = 0;
+		try {
+			BufferedReader reader = new BufferedReader(new FileReader(file));
+			String currentLine;
+			for (int i = 1; i < numThreads; i++) {
+				while ((currentLine = reader.readLine()) != null) {
+					String currentWord = currentLine.substring(0, currentLine.indexOf("\t"));
+					linesRead++;
+					if (linesRead > ((linesPerThread * i) - 50)) {
+						if (!lastWord.equalsIgnoreCase(currentWord)) {
+							breakPoints[i - 1] = linesRead;
+							break;
+						}
+					}
+					lastWord = currentWord;
+				}
+			}
+			reader.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		breakPoints[numThreads - 1] = numLines;
+		return breakPoints;
+	}
+	
+	public ArrayList<FileAssignment> createReducerFileAssignments(int[] breakPoints, File sortedMasterFile) {
+		ArrayList<FileAssignment> assignments = new ArrayList<FileAssignment>();
+		for (int i = 0; i < breakPoints.length; i++) {
+			FileAssignment current;
+			if (i == 0)
+				current = new FileAssignment(sortedMasterFile, 1, breakPoints[i] - 1);
+			else if (i == breakPoints.length - 1)
+				current = new FileAssignment(sortedMasterFile, breakPoints[i - 1], breakPoints[i]);
+			else
+				current = new FileAssignment(sortedMasterFile, breakPoints[i - 1], breakPoints[i] - 1);
+			assignments.add(current);
+		}
+		return assignments;
+	}
 	
 }
   

@@ -13,7 +13,7 @@ import java.util.HashMap;
 
 import edu.upenn.cis455.mapreduce.Context;
 
-public class WorkerContext implements Context {
+public class MapperContext implements Context {
 	
 	ArrayList<PrintWriter> fileWriters;
 	MessageDigest hashDigest;
@@ -25,7 +25,7 @@ public class WorkerContext implements Context {
 	 * @param workerNodeMap
 	 * @param spoolOutDir
 	 */
-	public WorkerContext(HashMap<String, String> workerNodeMap, String spoolOutDir) {
+	public MapperContext(HashMap<String, String> workerNodeMap, String spoolOutDir) {
 		System.out.println("Context: context created");
 		try {
 			hashDigest = MessageDigest.getInstance("SHA1");
@@ -50,7 +50,6 @@ public class WorkerContext implements Context {
 	public synchronized void write(String key, String value) {
 		int fileNum = getHash(key);
 		PrintWriter outputFileWriter = fileWriters.get(fileNum);
-		System.out.println("Context(new): writing to file: " + fileNum);
 		outputFileWriter.println(key + "\t" + value);
 	}
 	

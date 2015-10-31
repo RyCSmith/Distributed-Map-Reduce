@@ -10,7 +10,7 @@ import edu.upenn.cis455.mapreduce.Job;
 public class MapperThread extends Thread {
 	ArrayList<FileAssignment> fileAssignments;
 	Job jobClassInstance;
-	WorkerContext context;
+	MapperContext context;
 	
 	/**
 	 * Default constructor. 
@@ -18,7 +18,7 @@ public class MapperThread extends Thread {
 	 * @param jobClassInstance - Job class for this map reduce operation.
 	 * @param context - Context object for emit'ing to files.
 	 */
-	public MapperThread(ArrayList<FileAssignment> fileAssignments, Job jobClassInstance, WorkerContext context) {
+	public MapperThread(ArrayList<FileAssignment> fileAssignments, Job jobClassInstance, MapperContext context) {
 		this.fileAssignments = fileAssignments;
 		this.jobClassInstance = jobClassInstance;
 		this.context = context;

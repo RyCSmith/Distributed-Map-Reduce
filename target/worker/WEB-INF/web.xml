@@ -29,4 +29,8 @@
          <servlet-name>WorkerServlet</servlet-name>
          <url-pattern>/runreduce</url-pattern>
      </servlet-mapping>
+     <servlet-mapping>
+         <servlet-name>WorkerServlet</servlet-name>
+         <url-pattern>/pushdata</url-pattern>
+     </servlet-mapping>
 </web-app>
