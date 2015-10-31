@@ -30,7 +30,7 @@ public class WorkerServlet extends HttpServlet {
 	String storageRoot;
 	
 	/**
-	 * Servlet is initialized on container startup and doeds not wait for first request.
+	 * Servlet is initialized on container startup and does not wait for first request.
 	 * Starts a status updates thread.
 	 */
 	@Override
@@ -85,7 +85,8 @@ public class WorkerServlet extends HttpServlet {
 		response.setContentType("text/html");
 		PrintWriter out = response.getWriter();
 		out.println("<html><head><title>Worker</title></head>");
-		out.println("<body>Hi, I am the worker!</body></html>");
+		out.println("<body>This is the worker servlet.<br>It can receive jobs "
+				+ "via posts to /runmap and /runreduce.</body></html>");
 	}
 	
 	/**
@@ -207,8 +208,7 @@ public class WorkerServlet extends HttpServlet {
 			distributeFiles(numThreads, files, fileAssignments);
 		else 
 			divideFiles(numThreads, files, fileAssignments);
-		return fileAssignments;
-		
+		return fileAssignments;	
 	}
 	
 	/**

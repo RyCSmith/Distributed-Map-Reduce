@@ -24,7 +24,12 @@ public class WordCount implements Job {
   
   public void reduce(String key, String[] values, Context context)
   {
-    
+    Integer totalValue = 0;
+    for (String singleVal : values) {
+    	int parsedValue = Integer.parseInt(singleVal);
+    	totalValue += parsedValue;
+    }
+    context.write(key, totalValue.toString());
   }
   
 }

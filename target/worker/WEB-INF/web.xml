@@ -8,7 +8,7 @@
          <servlet-class>edu.upenn.cis455.mapreduce.worker.WorkerServlet</servlet-class>
          <init-param>
            <param-name>storagedir</param-name>
-           <param-value>/Users/ryancsmith/Documents/jetty_cluster/local_storage/jetty_2/</param-value>
+           <param-value>/Users/ryancsmith/Documents/jetty_cluster/local_storage/jetty_3/</param-value>
          </init-param>
          <init-param>
            <param-name>master</param-name>
@@ -16,7 +16,7 @@
          </init-param>
          <init-param>
            <param-name>port</param-name>
-           <param-value>8002</param-value>
+           <param-value>8003</param-value>
          </init-param>
          <load-on-startup>1</load-on-startup>
      </servlet>
