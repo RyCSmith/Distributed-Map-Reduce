@@ -8,6 +8,7 @@ public class ReducerContext implements Context {
 	
 	public ReducerContext(String outputDir) {
 		this.outputDir = outputDir;
+		System.out.println("Reducer Context: context created");
 	}
 	
 	@Override

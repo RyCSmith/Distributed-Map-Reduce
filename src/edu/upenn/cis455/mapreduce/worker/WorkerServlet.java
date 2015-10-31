@@ -367,6 +367,7 @@ public class WorkerServlet extends HttpServlet {
 		String jobClass = request.getParameter("job");
 		int numThreads = Integer.parseInt(request.getParameter("numThreads"));
 		String relativeOutputDir = request.getParameter("output");
+		System.out.println("\n\njob:" + jobClass + " numThreads:" + numThreads + " output:" + relativeOutputDir);
 		
 		//send response indicating that request was received
 		response.setContentType("text/html");
@@ -375,7 +376,7 @@ public class WorkerServlet extends HttpServlet {
 		out.close();
 		
 		File sortedMasterFile = sortAndCreateMasterFile();
-		int[] breakPoints = findBreakPoints(sortedMasterFile, 5);
+		int[] breakPoints = findBreakPoints(sortedMasterFile, numThreads);
 		
 		ArrayList<FileAssignment> fileAssignments = createReducerFileAssignments(breakPoints, sortedMasterFile);
 		ReducerContext context = new ReducerContext(getFullDirectoryPath(relativeOutputDir));
@@ -511,6 +512,8 @@ public class WorkerServlet extends HttpServlet {
 	}
 	
 	public int[] findBreakPoints(File file, int numThreads) {
+		if (numThreads == 1)
+			return new int[0];
 		int[] breakPoints = new int[numThreads];
 		int numLines = countNumberLines(file);
 		int linesPerThread = numLines / numThreads;
@@ -542,6 +545,10 @@ public class WorkerServlet extends HttpServlet {
 	
 	public ArrayList<FileAssignment> createReducerFileAssignments(int[] breakPoints, File sortedMasterFile) {
 		ArrayList<FileAssignment> assignments = new ArrayList<FileAssignment>();
+		if (breakPoints.length == 0) {
+			assignments.add(new FileAssignment(sortedMasterFile));
+			return assignments;
+		}
 		for (int i = 0; i < breakPoints.length; i++) {
 			FileAssignment current;
 			if (i == 0)
