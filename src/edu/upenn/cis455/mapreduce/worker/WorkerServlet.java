@@ -94,7 +94,7 @@ public class WorkerServlet extends HttpServlet {
 	 * method based on path.
 	 */
 	public void doPost(HttpServletRequest request, HttpServletResponse response) throws java.io.IOException {
-		System.out.println("Received a connection " + request.getServletPath());
+		System.out.println("WorkerServlet: Received a connection " + request.getServletPath());
 		if (request.getServletPath().equalsIgnoreCase("/runmap")) {
 			mapHandler(request, response);
 		}
@@ -142,10 +142,8 @@ public class WorkerServlet extends HttpServlet {
 			try {
 				Class mapperClass = Class.forName(jobClass);
 				mapperJob = (Job) mapperClass.newInstance();
-			} catch (InstantiationException | IllegalAccessException e) {
-				e.printStackTrace();
-			}catch (ClassNotFoundException e1) {
-				e1.printStackTrace();
+			} catch (Exception e) {
+				System.out.println("ERROR: Error while instatiating instance of requested class (WorkerServlet:146");
 			}
 			threadsList.add(new MapperThread(this, fileAssignments.get(i), mapperJob, context));
 		}
@@ -153,7 +151,7 @@ public class WorkerServlet extends HttpServlet {
 		//start all threads
 		for (MapperThread thread : threadsList) {
 			thread.start();
-			System.out.println("Starting thread: " + thread.getName() + " with assignments:");
+			System.out.println("WorkerServlet: Starting MapperThread: " + thread.getName() + " with assignments:");
 			for (FileAssignment assign : thread.fileAssignments) {
 				System.out.println("\t" + assign);
 			}
@@ -163,15 +161,18 @@ public class WorkerServlet extends HttpServlet {
 			try {
 				thread.join();
 			} catch (InterruptedException e) {
-				e.printStackTrace();
+				System.out.println("ERROR: MapperThread " + thread.getName() +
+						" received an InterruptedException after joining (WorkerServlet:164");
 			}
 		}	
 		//close PrintWriters opened in context
 		context.closeWriters();
 		//send files to other workers
 		pushDataToOtherWorkers(workerNodeMap);
+		//update status and force a status update to be sent without waiting for regular 10 second interval
+		System.out.println("WorkerServlet: Mapping Complete. Total duration: " + (System.currentTimeMillis() - startTime) / 1000);
 		status = Status.WAITING;
-		System.out.println("TOTAL MAP TIME: " + (System.currentTimeMillis() - startTime) / 1000);
+		update.sendUpdate();
 	}
 	
 	public HashMap<String, String> retrieveWorkerNodes(Map<String, String[]> paramMap) {
@@ -282,6 +283,8 @@ public class WorkerServlet extends HttpServlet {
 				count++;
 			}
 		} catch (Exception e) {
+			System.out.println("ERROR: Error counting number of lines in file: " + 
+					file.getName() + " (WorkerServlet:286");
 			return 2;
 		}
 		return count;
@@ -369,7 +372,7 @@ public class WorkerServlet extends HttpServlet {
 	 * @throws java.io.IOException
 	 */
 	public void reduceHandler(HttpServletRequest request, HttpServletResponse response) throws java.io.IOException {
-		System.out.println("GOT A REDUCE CALL");
+		long startTime = System.currentTimeMillis();
 		status = Status.REDUCING;
 		
 		//parse params from request
@@ -397,10 +400,8 @@ public class WorkerServlet extends HttpServlet {
 			try {
 				Class reducerClass = Class.forName(jobClass);
 				reducerJob = (Job) reducerClass.newInstance();
-			} catch (InstantiationException | IllegalAccessException e) {
-				e.printStackTrace();
-			}catch (ClassNotFoundException e1) {
-				e1.printStackTrace();
+			} catch (Exception e) {
+				System.out.println("ERROR: Error while instatiating instance of requested class (WorkerServlet:404");
 			}
 			threadsList.add(new ReducerThread(this, fileAssignments.get(i), reducerJob, context));
 		}
@@ -408,7 +409,7 @@ public class WorkerServlet extends HttpServlet {
 		//start all threads
 		for (ReducerThread thread : threadsList) {
 			thread.start();
-			System.out.println("Starting thread: " + thread.getName() + " with assignments:");
+			System.out.println("WorkerServlet: Starting ReducerThread: " + thread.getName() + " with assignments:");
 				System.out.println("\t" + thread.fileAssignment);
 		}
 		//join all threads
@@ -416,22 +417,30 @@ public class WorkerServlet extends HttpServlet {
 			try {
 				thread.join();
 			} catch (InterruptedException e) {
-				e.printStackTrace();
+				System.out.println("ERROR: ReducerThread " + thread.getName() +
+						" received an InterruptedException after joining (WorkerServlet:420");
 			}
 		}	
 		
 		//close PrintWriter opened in context
 		context.closeWriter();
 		
-		//reset statuses
+		//reset statuses and force status update to be sent without waiting for regular 10 second interval
+		System.out.println("WorkerServlet: Reducing Complete. Total duration: " + (System.currentTimeMillis() - startTime) / 1000);
 		resetKeysRead();
 		resetKeysWritten();
 		this.jobClass = null;
 		status = Status.IDLE;
+		update.sendUpdate();
 	}
 	
+	/**
+	 * Executes Unix commands as outside processes to concatenate and sort data in the spool-in directory.
+	 * Creates a file named sortedMasterFile.txt and saves all data to it.
+	 * @return
+	 */
 	public File sortAndCreateMasterFile() {
-		System.out.println("Concatenating and sorting \'spool-in\' files as an "
+		System.out.println("WorkerServlet: Concatenating and sorting \'spool-in\' files as an "
 				+ "outside unix process. (This may take some time)");
 		String sortedMasterFilePath = null;
 		try {
@@ -448,15 +457,20 @@ public class WorkerServlet extends HttpServlet {
 			Process proc2 = Runtime.getRuntime().exec(commandArray2);
 			proc2.waitFor();
 		} catch (Exception e) {
-			e.printStackTrace();
+			System.out.println("ERROR: Error while running outside Unix cat/sort processes (WorkerServlet:455)");
 		}
 		return new File(sortedMasterFilePath);
 	}
 	
+	/**
+	 * Receives a stream of data from another worker node and saves to a file in spool-in directory.
+	 * @param request
+	 * @param response
+	 */
 	public void receiveDataHandler(HttpServletRequest request, HttpServletResponse response) {
 		try {
 			File outputFile = new File(getNewRandomFileName(request.getRemoteAddr()));
-			System.out.println("Attempting to create file: " + outputFile.getAbsolutePath());
+			System.out.println("WorkerServlet: Attempting to create file for incoming data: " + outputFile.getAbsolutePath());
 			outputFile.createNewFile();
 			FileOutputStream writer = new FileOutputStream(outputFile, true);
 	
@@ -473,24 +487,34 @@ public class WorkerServlet extends HttpServlet {
 			out.println("SUCCESS");
 			in.close();
 		} catch (IOException e) {
-			e.printStackTrace();
+			System.out.println("ERROR: Error receiving data from " + request.getRemoteAddr() + " (WorkerServlet:480)");
 		}
 		
 	}
 	
+	/**
+	 * Pushes each file in the spool-out directory to the corresponding worker node.
+	 * @param workerNodeMap
+	 */
 	public void pushDataToOtherWorkers(HashMap<String, String> workerNodeMap) {
 		File spoolOutDir = new File(getFullDirectoryPath("spool-out"));
 		List<File> temp = Arrays.asList(spoolOutDir.listFiles());
 		for (File file : temp) {
 			for (String key : workerNodeMap.keySet()) {
 				if (file.getName().contains(key)) {
-					System.out.println("PUSHING file data: " + file.getName() + " to " + key + " at " + workerNodeMap.get(key));
+					System.out.println("WorkerServlet: Pushing file data: " + file.getName() + " to " + key + " at " + workerNodeMap.get(key));
 					pushDataToWorker(file, workerNodeMap.get(key));
 				}
 			}
 		}
 	}
 	
+	/**
+	 * Streams the contents of the given file to another worker node located
+	 * at the provided IP and port.
+	 * @param file
+	 * @param ipAndPort
+	 */
 	public void pushDataToWorker(File file, String ipAndPort) {
 		try {
 			
@@ -520,10 +544,17 @@ public class WorkerServlet extends HttpServlet {
 			in.close();
 	
 		} catch (IOException e) {
-			e.printStackTrace();
+			System.out.println("ERROR: Error pushing data to " + ipAndPort + " (WorkerServlet:527)");
 		}
 	}
 	
+	/**
+	 * Calculates (approximately) even break points within the file while making sure
+	 * that all series of entries for a given key will be handled by the same thread.
+	 * @param file
+	 * @param numThreads
+	 * @return
+	 */
 	public int[] findBreakPoints(File file, int numThreads) {
 		if (numThreads == 1)
 			return new int[0];
@@ -550,12 +581,18 @@ public class WorkerServlet extends HttpServlet {
 			}
 			reader.close();
 		} catch (IOException e) {
-			e.printStackTrace();
+			System.out.println("ERROR: Error calculating break points in file (WorkerServlet:557");
 		}
 		breakPoints[numThreads - 1] = numLines;
 		return breakPoints;
 	}
 	
+	/**
+	 * Creates FileAssignments for ReducerThreads based on break points and a file.
+	 * @param breakPoints
+	 * @param sortedMasterFile
+	 * @return
+	 */
 	public ArrayList<FileAssignment> createReducerFileAssignments(int[] breakPoints, File sortedMasterFile) {
 		ArrayList<FileAssignment> assignments = new ArrayList<FileAssignment>();
 		if (breakPoints.length == 0) {
@@ -575,24 +612,36 @@ public class WorkerServlet extends HttpServlet {
 		return assignments;
 	}
 	
+	/**
+	 * Increments keysRead value by 1;
+	 */
 	public void incrementKeysRead() {
 		synchronized (keysRead) {
 			keysRead += 1;
 		}
 	}
 	
+	/**
+	 * Increments keysWritten value by 1.
+	 */
 	public void incrementKeysWritten() {
 		synchronized (keysWritten) {
 			keysWritten += 1;
 		}
 	}
 	
+	/**
+	 * Sets keysRead value to 0;
+	 */
 	public void resetKeysRead() {
 		synchronized (keysRead) {
 			keysRead = 0;
 		}
 	}
 	
+	/**
+	 * Sets keysWritten value to 0;
+	 */
 	public void resetKeysWritten() {
 		synchronized (keysWritten) {
 			keysWritten = 0;

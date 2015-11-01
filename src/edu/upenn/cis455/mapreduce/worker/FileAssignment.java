@@ -2,6 +2,10 @@ package edu.upenn.cis455.mapreduce.worker;
 
 import java.io.File;
 
+/**
+ * Holds information regarding a portion of data that should be 
+ * processed by a given thread.
+ */
 public class FileAssignment {
 	File file;
 	public Integer startLine;

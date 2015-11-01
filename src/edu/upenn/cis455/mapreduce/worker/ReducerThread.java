@@ -66,10 +66,9 @@ public class ReducerThread extends Thread {
 			}
 			//submit job that was in progress while file ended
 			submitToReduce(currentKey, valueSet);
-			
 			reader.close();
 		} catch (Exception e) {
-			e.printStackTrace();
+			System.out.println("ERROR: Error in reducer thread " + this.getName() + " (ReducerThread:71)");
 		}
 	}
 	

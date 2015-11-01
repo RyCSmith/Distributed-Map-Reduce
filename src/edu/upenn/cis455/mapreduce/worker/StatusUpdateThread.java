@@ -21,24 +21,12 @@ public class StatusUpdateThread extends Thread {
 	}
 	
 	/**
-	 * Main operation of the thread. Sends a status update regarding this
-	 * node to the master node every ten seconds.
+	 * Main operation of the thread. Calls sendUpdate() to send a status 
+	 * update regarding this node to the master node every ten seconds.
 	 */
 	public void run() {
 		while (report) {
-			System.out.println("StatusUpdateThread: send status " + servlet.status );
-			String queryString = "?port=" + servlet.port + "&" + "status=" + servlet.status + "&" + 
-					"job=" + servlet.jobClass + "&" + "keysRead=" + servlet.keysRead + "&" + "keysWritten=" + servlet.keysWritten;
-			HttpClient client = new HttpClient(masterLocation, queryString);
-			try {
-				client.makeRequest();
-			} catch (IOException e1) {}
-			try {
-				Thread.sleep(10000);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-				//right now, just prints any errors to console, good candidate for logging
-			}
+			sendUpdate();
 		}
 	}
 	
@@ -47,5 +35,23 @@ public class StatusUpdateThread extends Thread {
 	 */
 	public void requestStop() {
 		report = false;
+	}
+	
+	/**
+	 * Sends a status update regarding this node to the master node.
+	 */
+	public void sendUpdate() {
+		System.out.println("StatusUpdateThread: send status " + servlet.status );
+		String queryString = "?port=" + servlet.port + "&" + "status=" + servlet.status + "&" + 
+				"job=" + servlet.jobClass + "&" + "keysRead=" + servlet.keysRead + "&" + "keysWritten=" + servlet.keysWritten;
+		HttpClient client = new HttpClient(masterLocation, queryString);
+		try {
+			client.makeRequest();
+		} catch (IOException e1) {}
+		try {
+			Thread.sleep(10000);
+		} catch (InterruptedException e) {
+			System.out.println("ERROR: Error sending status updated. (StatusUpdateThread:51)");
+		}
 	}
 }

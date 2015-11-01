@@ -36,7 +36,7 @@ public class MapperContext implements Context {
 		try {
 			hashDigest = MessageDigest.getInstance("SHA1");
 		} catch (NoSuchAlgorithmException e1) {
-			e1.printStackTrace();
+			System.out.println("ERROR: Error creating hash scheme in MapperContext (MapperContext:39)");
 		}
 		fileWriters = new ArrayList<PrintWriter>();
 		for (String key : workerNodeMap.keySet()) {
@@ -46,13 +46,16 @@ public class MapperContext implements Context {
 				PrintWriter writer = new PrintWriter(new BufferedWriter(new FileWriter(file)));
 				fileWriters.add(writer);
 			} catch (IOException e) {
-				e.printStackTrace();
+				System.out.println("ERROR: Error writing to file in MapperContext (MapperContext:49)");
 			}
 		}
 		modNum = new BigInteger(new Integer(fileWriters.size()).toString());
-		System.out.println("Context: context created");
+		System.out.println("Context: Context created.");
 	}
 	
+	/**
+	 * Writes output to the proper file (determined using hash).
+	 */
 	@Override
 	public synchronized void write(String key, String value) {
 		int fileNum = getHash(key);
@@ -61,6 +64,12 @@ public class MapperContext implements Context {
 		masterServlet.incrementKeysWritten();
 	}
 	
+	/**
+	 * Creates an SHA-1 hash value for the given key, mod's it by numThreads
+	 * and returns the index of the file that the line should be written to.
+	 * @param key
+	 * @return
+	 */
 	public int getHash(String key) {
 		hashDigest.update(key.getBytes());
 		byte[] output = hashDigest.digest();
@@ -68,8 +77,10 @@ public class MapperContext implements Context {
      	return big.mod(modNum).intValue();
 	}
 	
+	/**
+	 * Closes the writers that were opened for all files.
+	 */
 	public void closeWriters() {
-		System.out.println("Context: writers being closed.");
 		for (PrintWriter writer : fileWriters) {
 			writer.close();
 		}

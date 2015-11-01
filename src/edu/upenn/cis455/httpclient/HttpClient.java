@@ -15,7 +15,11 @@ import java.util.HashMap;
 
 import java.text.ParseException;
 
-
+/**
+ * Basic HTTP Client
+ * @author ryancsmith
+ *
+ */
 public class HttpClient {
 	HashMap<String, String> responseData;
 	String hostName;

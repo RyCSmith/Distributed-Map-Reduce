@@ -35,7 +35,7 @@ public class FeederThread extends Thread {
 	 * Waits for workers to complete mapping and asks them to reduce when all are finished.
 	 */
 	public void run() {
-		System.out.println("Feeder thread: started");
+		System.out.println("Feeder thread: started.");
 		while (proceed) {
 			try {
 				System.out.println("Feeder thread: Get Job");
@@ -51,7 +51,7 @@ public class FeederThread extends Thread {
 				waitToProceedToNextJob();
 				System.out.println("Feeder thread: Complete");
 			} catch (Exception e) {
-				e.printStackTrace();
+				System.out.println("ERROR: Error running job queue (FeederThread:54)");
 			}
 		}
 		
@@ -111,8 +111,11 @@ public class FeederThread extends Thread {
 	public synchronized void checkThreadsReadyToReduce() {
 		synchronized (workersStatus) {
 			for (String key : workersStatus.keySet()) {
-				if (workersStatus.get(key).status != WorkerData.Status.WAITING)
-					return;
+				WorkerData data = workersStatus.get(key);
+				if (System.currentTimeMillis() - data.timeReceived.getTimeInMillis() < 30000) {
+					if (data.status != WorkerData.Status.WAITING)
+						return;
+				}
 			}
 		}
 		workersReadyToReduce = true;
@@ -130,34 +133,46 @@ public class FeederThread extends Thread {
 	private void sendJobToWorkers(int mode, String job, String directory, String numThreads) throws Exception {
 		synchronized (workersStatus) {
 			for (String key : workersStatus.keySet()) {
-				String url = null; 
-				if (mode == 0)
-					url = "http://" + key + "/worker/runmap";
-				else
-					url = "http://" + key + "/worker/runreduce";
-				URL obj = new URL(url);
-				HttpURLConnection client = (HttpURLConnection) obj.openConnection();
-				client.setRequestMethod("POST");	
+				WorkerData data = workersStatus.get(key);
+				if (System.currentTimeMillis() - data.timeReceived.getTimeInMillis() < 30000) {
+					DataOutputStream outStream = null;
+					BufferedReader in = null;
+					try {
+						String url = null; 
+						if (mode == 0)
+							url = "http://" + key + "/worker/runmap";
+						else
+							url = "http://" + key + "/worker/runreduce";
+						URL obj = new URL(url);
+						HttpURLConnection client = (HttpURLConnection) obj.openConnection();
+						client.setConnectTimeout(5000);
+						client.setRequestMethod("POST");	
+						
+						String params;
+						if (mode == 0)
+							params = params = "job=" + job + "&input=" + directory + "&numThreads=" + numThreads + getActiveWorkersQueryString();
+						else
+							params = params = "job=" + job + "&output=" + directory + "&numThreads=" + numThreads;
+						
+						client.setDoOutput(true);
+						outStream = new DataOutputStream(client.getOutputStream());
+						outStream.writeBytes(params);
+						outStream.flush();
+						outStream.close();
 				
-				String params;
-				if (mode == 0)
-					params = params = "job=" + job + "&input=" + directory + "&numThreads=" + numThreads + getActiveWorkersQueryString();
-				else
-					params = params = "job=" + job + "&output=" + directory + "&numThreads=" + numThreads;
-				
-				client.setDoOutput(true);
-				DataOutputStream outStream = new DataOutputStream(client.getOutputStream());
-				outStream.writeBytes(params);
-				outStream.flush();
-				outStream.close();
-		
-				BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
-				String inputLine;
-				StringBuffer response = new StringBuffer();
-				while ((inputLine = in.readLine()) != null) {
-					response.append(inputLine);
+						in = new BufferedReader(new InputStreamReader(client.getInputStream()));
+						String inputLine;
+						StringBuffer response = new StringBuffer();
+						while ((inputLine = in.readLine()) != null) {
+							response.append(inputLine);
+						}
+						in.close();
+					} catch (Exception e) {
+						//this will catch SocketInterruptedException, this is thrown on timeout (worker node went offline)
+						if (outStream != null) outStream.close();
+						if (in != null) in.close();
+					}
 				}
-				in.close();
 			}
 		}
 	}
@@ -200,8 +215,11 @@ public class FeederThread extends Thread {
 	public synchronized void checkThreadsReadyForNextJob() {
 		synchronized (workersStatus) {
 			for (String key : workersStatus.keySet()) {
-				if (workersStatus.get(key).status != WorkerData.Status.IDLE)
-					return;
+				WorkerData data = workersStatus.get(key);
+				if (System.currentTimeMillis() - data.timeReceived.getTimeInMillis() < 30000) {
+					if (data.status != WorkerData.Status.IDLE)
+						return;
+				}
 			}
 		}
 		workersReadyForNextJob = true;

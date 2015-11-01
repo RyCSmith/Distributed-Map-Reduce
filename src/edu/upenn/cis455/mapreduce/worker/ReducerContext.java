@@ -30,9 +30,9 @@ public class ReducerContext implements Context {
 			outputFile.createNewFile();
 			outputWriter = new PrintWriter(new BufferedWriter(new FileWriter(outputFile)));
 		} catch (IOException e) {
-			e.printStackTrace();
+			System.out.println("ERROR: Error creating ReducerContext (ReducerContext:33");
 		}
-		System.out.println("Reducer Context: context created");
+		System.out.println("Reducer Context: context created.");
 	}
 	
 	/**
@@ -47,7 +47,9 @@ public class ReducerContext implements Context {
 	public void closeWriter() {
 		try {
 			outputWriter.close();
-		} catch (Exception e) { }
+		} catch (Exception e) { 
+			System.out.println("ERROR: Error closing ReducerContext writer (ReducerContext:51");
+		}
 	}
 	
 	/**

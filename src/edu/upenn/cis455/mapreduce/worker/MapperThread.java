@@ -35,7 +35,7 @@ public class MapperThread extends Thread {
 			try {
 				readAndProcessFA(current);
 			} catch (IOException e) {
-				e.printStackTrace();
+				System.out.println("ERROR: Error running MapperThread " + this.getName() + " (MapperThread:38)");
 			}
 		}
 	}

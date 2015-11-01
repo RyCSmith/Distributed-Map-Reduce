@@ -3,6 +3,9 @@ package edu.upenn.cis455.mapreduce.worker;
 import java.io.File;
 import java.util.Comparator;
 
+/**
+ * Compares the length (in bytes) of 2 files.
+ */
 public class FileLengthComparator implements Comparator<File> {
 	public int compare(File file1, File file2) {
 		long file1length = file1.length();

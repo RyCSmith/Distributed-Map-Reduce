@@ -125,7 +125,8 @@ public class MasterServlet extends HttpServlet {
 	    	feederThread.checkThreadsReadyForNextJob();
 	    	out.println("SUCCESS");
 	    } catch (Exception e) {
-	    	out.println("FAILURE");
+	    	System.out.println("ERROR: Error receiving status from worker " 
+	    			+ request.getRemoteAddr() + " (MasterServlet:128)");
 	    }     
 	}
 	
@@ -148,6 +149,7 @@ public class MasterServlet extends HttpServlet {
 	    } catch (Exception e) {
 	    	flashMessages.add("<div style=\"color:red;\">An error was encountered while receiving your submission. Please try again</div>");
 	    	response.sendRedirect("/master/status");
+	    	System.out.println("ERROR: Error receiving job request from " + request.getRemoteAddr() + " (MasterServlet:153)");
 	    }     
 		response.sendRedirect("/master/status");
 	}	
