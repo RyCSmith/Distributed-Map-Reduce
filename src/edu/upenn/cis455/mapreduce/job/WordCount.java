@@ -17,7 +17,6 @@ public class WordCount implements Job {
     	wordCount.put(word, wordCount.get(word) + 1);
     }
     for (String wordKey : wordCount.keySet()) {
-    	//System.out.println("MAP: " + wordKey + " - " + wordCount.get(wordKey).toString());
     	context.write(wordKey, wordCount.get(wordKey).toString());
     }
   }

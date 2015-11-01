@@ -26,9 +26,7 @@ public class ReducerContext implements Context {
 	public ReducerContext(WorkerServlet masterServlet, String outputDir) {
 		this.masterServlet = masterServlet;
 		try {
-			File outputFile = new File(outputDir);
-			if (outputFile.exists())
-				outputFile.delete();
+			File outputFile = makeOutputFile(outputDir);
 			outputFile.createNewFile();
 			outputWriter = new PrintWriter(new BufferedWriter(new FileWriter(outputFile)));
 		} catch (IOException e) {
@@ -50,5 +48,32 @@ public class ReducerContext implements Context {
 		try {
 			outputWriter.close();
 		} catch (Exception e) { }
+	}
+	
+	/**
+	 * Creates a file with a unique name to write results to.
+	 * @param outputDir
+	 * @return
+	 */
+	public File makeOutputFile(String outputDir) {
+		String fullPath = getFullPath(outputDir);
+		File outputFile = new File(fullPath);
+		while (outputFile.exists())
+			outputFile = new File(getFullPath(outputDir));
+		return outputFile;
+	}
+	
+	/**
+	 * Creates a unique file path that does not yet exist.
+	 * @param outputDir
+	 * @return
+	 */
+	public String getFullPath(String outputDir) {
+		String fullPath;
+		if (outputDir.endsWith("/"))
+			fullPath = outputDir + "results-" + masterServlet.jobClass + "-" + System.currentTimeMillis() + ".txt";
+		else
+			fullPath = outputDir + "/results-" + masterServlet.jobClass + "-" + System.currentTimeMillis() + ".txt";
+		return fullPath;
 	}
 }
