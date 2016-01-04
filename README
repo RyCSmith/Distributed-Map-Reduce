@@ -6,7 +6,7 @@ Design: All code by Ryan Smith. Submitted for CIS-555 at University of Pennsylva
 
 Use: 
 
-a) This program can be deployed across multiple nodes and uses Java Servlets for web connectivity. It comes with an Ant build script that can be used to produce .war files that can be deployed in any general servley container ('ant build'). 
+a) This program can be deployed across multiple nodes and uses Java Servlets for web connectivity. It comes with an Ant build script that can be used to produce .war files that can be deployed in any general servlet container ('ant build'). 
 
 b) A worker must be informed of it's IP and Port which can be set in worker/web.xml and should be set before building. 
 
