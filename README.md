@@ -4,6 +4,8 @@ Overview: Distributed Program for processing map reduce jobs across a dynamic nu
 
 Design: All code by Ryan Smith. Submitted for CIS-555 at University of Pennsylvania. Ant build script and package skeletons provided by Professor Zach Ives.
 
+Demonstration video can be seen on YouTube here: https://youtu.be/TQGz7WPcGWo
+
 Use: 
 
 a) This program can be deployed across multiple nodes and uses Java Servlets for web connectivity. It comes with an Ant build script that can be used to produce .war files that can be deployed in any general servlet container ('ant build'). 
