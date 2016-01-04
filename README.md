@@ -1,0 +1,21 @@
+#Map Reduce Distributed System
+
+Overview: Distributed Program for processing map reduce jobs across a dynamic number of worker nodes coordinated by one master.
+
+Design: All code by Ryan Smith. Submitted for CIS-555 at University of Pennsylvania. Ant build script and package skeletons provided by Professor Zach Ives.
+
+Use: 
+
+a) This program can be deployed across multiple nodes and uses Java Servlets for web connectivity. It comes with an Ant build script that can be used to produce .war files that can be deployed in any general servlet container ('ant build'). 
+
+b) A worker must be informed of it's IP and Port which can be set in worker/web.xml and should be set before building. 
+
+c) After launching, each worker will report to the master in 10 second intervals informing the master of their status (IDLE, MAPPING, etc.) and current condition (Keys Processed, etc. if relevant). 
+
+d) The master retains records of these reports and a worker will be considered to have failed and be offline after failing to report for 30 seconds. 
+
+e) The master provides a simple web interface through which jobs can be submitted. A .class file containing a map reduce job (which must implement Job and emit to Context) can be loaded dynamically. At the moment, the master does not transmit the file and it is expected to be on each worker's classpath. 
+
+f) After receiving a job via the web interface, the master divides the work among the available workers and relays all job data including the number of threads that should be used in each step.
+
+g) The workers then process MAP the data and hash the results to assign each emitted pair to one of the other available workers. The workers then send the mapped data to each other according to this hash. After data from all other workers has been received, the workers REDUCE the data and output results to the location specified by the user where they can be collected. 
